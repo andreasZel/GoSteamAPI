@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/andreasZel/GoSteamAPI/GoSteamAPI/Models"
+	"github.com/andreasZel/GoSteamAPI/Models"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
