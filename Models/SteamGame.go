@@ -13,7 +13,10 @@ type SteamGame struct {
 	Capsule_image	string				`json:"capsule_image" bson:"capsule_image"`
 	Developers		[]string			`json:"developers" bson:"developers"`
 	Publishers		[]string			`json:"publishers" bson:"publishers"`
-	Price			string				`json:"price" bson:"price"`
+	Price			[]struct {
+						PriceOnDate		string  `json:"priceOnDate" bson:"priceOnDate"`
+						Date 			string	`json:"date" bson:"date"`
+					}  `json:"price" bson:"price"`
 	Platforms		[]string			`json:"platforms" bson:"platforms"`
 	Metacritic		[]string			`json:"metacritic" bson:"metacritic"`
 	Genres			[]string			`json:"genres" bson:"genres"`

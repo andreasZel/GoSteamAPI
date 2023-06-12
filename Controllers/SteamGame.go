@@ -66,23 +66,30 @@ func (GC GameController) AllGames (
 	fmt.Println(writer, "%s\n", steam_gamesjson)
 }
 
-// [GET] GetsteamGame (id)
+// [GET] GetsteamGame 
 func (GC GameController) GetSteamGame (
 	writer http.ResponseWriter, 
 	request *http.Request, 
 	params httprouter.Params) {
 
-	//Get id from parameters of get request 
-	id := params.ByName("id")
+	//Get the steamGameId from response body
+	steamGameId := ResponseGameId{} 
 
-	if !bson.IsObjectIdHex(id) {
-		writer.WriteHeader(http.StatusNotFound)
+	err := json.NewDecoder(request.Body).Decode(&steamGameId)
+	
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	if steamGameId.GameId == "" {
+		fmt.Println("Provide a GameId in Body, example { GameId : 1203220 }")
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	//Transform it to bson object id, because we use mongo
-	oid := bson.ObjectIdHex(id)
-	filter := bson.M{"_id": bson.M{"$eq": oid}}
+	//Create filter to find if the steamappId exist in db
+	filter := bson.M{"steam_appid" : steamGameId.GameId}
 
 	//Get our SteamGame model
 	steam_games := Models.SteamGame{} 
@@ -91,11 +98,12 @@ func (GC GameController) GetSteamGame (
 	//it to steam_games model
 	ctx := context.Background()
 
-	if err := GC.client.Database("SteamPriceDB").Collection("SteamGames").FindOne(ctx, filter).Decode(&steam_games); err != nil {
-		writer.WriteHeader(http.StatusNotFound)
+	if err :=  GC.client.Database("SteamPriceDB").Collection("SteamGames").FindOne(ctx, filter).Decode(&steam_games); err != nil {
+		fmt.Println(err)
+		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	
+
 	//Transform the results to json
 	steam_Gamejson, err := json.Marshal(steam_games)
 	
@@ -106,7 +114,7 @@ func (GC GameController) GetSteamGame (
 	//Display Ok if everything worked out
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
-	fmt.Println(writer, "%s\n", steam_Gamejson)
+	fmt.Fprintf(writer, "%s\n", steam_Gamejson)
 }
 
 
@@ -116,7 +124,7 @@ func (GC GameController) CreateGame (
 	request *http.Request, 
 	_ httprouter.Params) {
 
-	//Get the values from postman 
+	//Get the steamGameId from response body
 	steamGameId := ResponseGameId{} 
 
 	err := json.NewDecoder(request.Body).Decode(&steamGameId)
@@ -170,10 +178,23 @@ func (GC GameController) CreateGame (
 	json.Unmarshal([]byte(gjson.GetBytes(body, `` + steamGameId.GameId + `.data.developers`).String()), &steam_games.Developers)
 	json.Unmarshal([]byte(gjson.GetBytes(body, `` + steamGameId.GameId + `.data.publishers`).String()), &steam_games.Publishers)
 	
+	currentTime := time.Now()
+
+	fmt.Println(len(steam_games.Price))
+
+	game_price_struct := `[{
+							"priceOnDate" : "",
+							"Date" : ""
+						}]`
+
+	json.Unmarshal([]byte(game_price_struct), &steam_games.Price)
+
 	if gjson.GetBytes(body, `` + steamGameId.GameId + `.data.is_free`).String() == "false" {	
-		steam_games.Price = gjson.GetBytes(body, `` + steamGameId.GameId + `.data.price_overview.final_formatted`).String()
+		steam_games.Price[0].PriceOnDate = gjson.GetBytes(body, `` + steamGameId.GameId + `.data.price_overview.final_formatted`).String()
+		steam_games.Price[0].Date = strconv.FormatInt(currentTime.Unix(), 10)
 	} else {
-		steam_games.Price = "free"
+		steam_games.Price[0].PriceOnDate = "free"
+		steam_games.Price[0].Date = strconv.FormatInt(currentTime.Unix(), 10)
 	}
 	
 	steam_games.Platforms = append(steam_games.Platforms, gjson.GetBytes(body, `` + steamGameId.GameId + `.data.platforms.windows`).String())
@@ -258,7 +279,6 @@ func (GC GameController) CreateGame (
 	//fmt.Println(CheapSharkDat)
 
 	GameDeals.CheapSharkId = CheapSharkDat[0]["gameID"]
-    //GameDeals.Cheapest = CheapSharkDat[0]["cheapest"]
 
 	//Send GET Request to cheapshark to get the Deals for the game
 	apiUrl3 := `https://www.cheapshark.com/api/1.0/games?id=` + GameDeals.CheapSharkId + ``
@@ -282,12 +302,8 @@ func (GC GameController) CreateGame (
 	GameDeals.Cheapest = append(GameDeals.Cheapest, gjson.GetBytes(body4, `cheapestPriceEver.price`).String())
 	GameDeals.Cheapest = append(GameDeals.Cheapest, gjson.GetBytes(body4, `cheapestPriceEver.date`).String())
 
-	//var DealsDat []map[string]string
-
 	json.Unmarshal([]byte(gjson.GetBytes(body4, `deals`).String()), &GameDeals.Deals)
 	
-	currentTime := time.Now()
-
 	for idx := range GameDeals.Deals {
 		GameDeals.Deals[idx].Date = strconv.FormatInt(currentTime.Unix(), 10)
     }
@@ -302,53 +318,233 @@ func (GC GameController) CreateGame (
 
 	fmt.Println(result2)
 
+	//Transform the results to json
+	steam_Gamejson, err := json.Marshal(steam_games)
+	
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	//Display Ok if everything worked out
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(writer, "%s\n", steam_Gamejson)
 }
 
-// [POST] UpdateGame (id)
+// [POST] UpdateGame 
 func (GC GameController) UpdateGame (
 	writer http.ResponseWriter, 
 	request *http.Request, 
 	params httprouter.Params) {
 
-	//Get id from parameters of get request 
-	id := params.ByName("id")
+	//Get the steamGameId from response body
+	steamGameId := ResponseGameId{} 
 
-	if !bson.IsObjectIdHex(id) {
-		writer.WriteHeader(http.StatusNotFound)
-		return 
+	err := json.NewDecoder(request.Body).Decode(&steamGameId)
+	
+	if err != nil {
+		fmt.Println(err)
 	}
 
-	//Transform it to bson object id, because we use mongo
-	oid := bson.ObjectIdHex(id)
+	if steamGameId.GameId == "" {
+		fmt.Println("Provide a GameId in Body, example { GameId : 1203220 }")
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-	// Declare an _id filter to get a specific MongoDB document
-	filter := bson.M{"_id": bson.M{"$eq": oid}}
-	
+	//Create filter to find if the steamappId exist in db
+	filter := bson.M{"steam_appid" : steamGameId.GameId}
+
 	//Get our SteamGame model
 	steam_games := Models.SteamGame{} 
 
-	//Get the values from postman 
-	//? Later change to a call to steamAPI
-	json.NewDecoder(request.Body).Decode(&steam_games)
+	//Find a file that has that bson object id and pass 
+	//it to steam_games model
+	ctx := context.Background()
+
+	if err :=  GC.client.Database("SteamPriceDB").Collection("SteamGames").FindOne(ctx, filter).Decode(&steam_games); err != nil {
+		fmt.Println(err)
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	//Send GET Request to steam API  
+	apiUrl := `https://store.steampowered.com/api/appdetails/?appids=` + steamGameId.GameId + ``
+	response, err := http.Get(apiUrl)
+   	
+	if err != nil {
+      	fmt.Println("err")
+   	}
+	
+	//Close Body on return of function
+	defer response.Body.Close()
+	
+	//Read the response body
+	body, err := io.ReadAll(response.Body)
+
+	if err != nil {
+		fmt.Println(err)
+   	}
+
+	//Get only specific fields using gjson package
+	value := gjson.GetBytes(body, `` + steamGameId.GameId + `.success`)
+
+	if value.String() == "false" {
+		fmt.Println("Game does not exist in steam API")
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	currentTime := time.Now()
+	current_price := gjson.GetBytes(body, `` + steamGameId.GameId + `.data.price_overview.final_formatted`).String()
+	current_time_unix := strconv.FormatInt(currentTime.Unix(), 10)
+
+	if steam_games.Price[len(steam_games.Price) - 1].PriceOnDate != current_price &&
+	   steam_games.Price[len(steam_games.Price) - 1].Date != current_time_unix {
+		
+		//Define a temporary Price with the current values
+		var price_to_add struct {
+			PriceOnDate		string  `json:"priceOnDate" bson:"priceOnDate"`
+			Date 			string  `json:"date" bson:"date"`
+		}
+		
+		price_to_add.PriceOnDate = current_price
+		price_to_add.Date = current_time_unix
+
+		//Append the struct to the previous array of structs
+		steam_games.Price = append(steam_games.Price, price_to_add)
+	
+		//Declare a filter that will change field values 
+		//according to SteamGame struct
+		update := bson.M{"$set": bson.M{"price": steam_games.Price}}
+
+		//Incert the new Price to our collection
+		result3, err := GC.client.Database("SteamPriceDB").Collection("SteamGames").UpdateOne(ctx, filter, update)
+
+		if err != nil {
+			writer.WriteHeader(http.StatusNotModified)
+			fmt.Println(err)
+			return 
+		}
+
+		fmt.Println(result3)
+	}
+
+	//Get our GameDeals Model
+	GameDeals := Models.GameDeals{}
+
+	//Create filter to find if the steamappId exist in db
+	filter2 := bson.M{"game": steam_games.Id}
+
+	if err :=  GC.client.Database("SteamPriceDB").Collection("GameDeals").FindOne(ctx, filter2).Decode(&GameDeals); err != nil {
+		fmt.Println(err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	//Send GET Request to cheapshark to get the Deals for the game
+	apiUrl3 := `https://www.cheapshark.com/api/1.0/games?id=` + GameDeals.CheapSharkId + ``
+	response4, err := http.Get(apiUrl3)
+   	
+	if err != nil {
+      	fmt.Println("err")
+   	}
+	
+	//Close Body on return of function
+	defer response4.Body.Close()
+
+	//Read the response body
+	body4, err := io.ReadAll(response4.Body)
+
+	if err != nil {
+		fmt.Println(err)
+   	}
+
+	//Get current values
+	current_cheapes := gjson.GetBytes(body4, `cheapestPriceEver.price`).String()
+
+	if GameDeals.Cheapest[0] != current_cheapes {
+		GameDeals.Cheapest[0] = gjson.GetBytes(body4, `cheapestPriceEver.price`).String()
+		GameDeals.Cheapest[1] = gjson.GetBytes(body4, `cheapestPriceEver.date`).String()
+	}
+
+	//Create a temporary array of Deal structs
+	var current_deals []struct{
+		StoreId			string  `json:"storeId" bson:"storeId"`
+		RetailPrice 	string	`json:"retailPrice" bson:"retailPrice"`
+		Date			string	`json:"date" bson:"date"`
+	}
+	
+	json.Unmarshal([]byte(gjson.GetBytes(body4, `deals`).String()), &current_deals)
+	
+
+	fmt.Println(GameDeals)
+	fmt.Println("current_deals length:")
+	fmt.Println(len(current_deals))
+
+	for idx := range current_deals {
+
+		err_sameVal := false
+		current_price, _ := strconv.ParseFloat(current_deals[idx].RetailPrice, 32)
+
+		//Check if the deal already exist
+		for idy := range GameDeals.Deals {
+			
+			gamedeals_price, _ := strconv.ParseFloat(GameDeals.Deals[idy].RetailPrice, 32)
+
+			if GameDeals.Deals[idy].Date[0:6] == current_time_unix[0:6] &&
+			   GameDeals.Deals[idy].StoreId == current_deals[idx].StoreId {
+				fmt.Println("GameDeals date :")
+				fmt.Println(GameDeals.Deals[idy].Date[0:6])
+				fmt.Println("GameDeals id :")
+				fmt.Println(GameDeals.Deals[idy].StoreId)
+				fmt.Println("current_deals date :")
+				fmt.Println(current_time_unix[0:6])
+				fmt.Println("current_deals id :")
+				fmt.Println(current_deals[idx].StoreId)
+
+				//if the price was lowered in a day, update the price
+				if gamedeals_price < current_price {
+					fmt.Println("GameDeals price :")
+					fmt.Println(gamedeals_price)
+					fmt.Println("current_deals price :")
+					fmt.Println(current_price)
+
+					GameDeals.Deals[idy].RetailPrice = current_deals[idx].RetailPrice 
+				}
+				err_sameVal = true
+				break
+			}
+		}
+
+		//If the price does not exist in db
+		//append the struct to the previous array of structs
+		if err_sameVal != true {
+			current_deals[idx].Date = current_time_unix
+			GameDeals.Deals = append(GameDeals.Deals, current_deals[idx])
+		}
+	}
 
 	//Declare a filter that will change field values 
 	//according to SteamGame struct
-	update := steam_games
-
-	ctx := context.Background()
+	update2 := bson.M{"$set": bson.M{"cheapest": GameDeals.Cheapest, "deals": GameDeals.Deals}}
 
 	//Incert the new deals for our collection
-	result3, err := GC.client.Database("SteamPriceDB").Collection("SteamGames").UpdateOne(ctx, filter, update)
+	result4, err := GC.client.Database("SteamPriceDB").Collection("GameDeals").UpdateOne(ctx, filter2, update2)
 
 	if err != nil {
 		writer.WriteHeader(http.StatusNotModified)
 		fmt.Println(err)
-		return //? ======> DEBUG <======
+		return 
 	}
 
-	fmt.Println(result3)
+	fmt.Println(result4)
 
 	steam_gamesjson, err := json.Marshal(steam_games)	
 
@@ -358,7 +554,7 @@ func (GC GameController) UpdateGame (
 
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
-	fmt.Println(writer, "%s\n", steam_gamesjson)
+	fmt.Fprintf(writer, "%s\n", steam_gamesjson)
 }
 
 //[DELETE] DeleteGame (id)
