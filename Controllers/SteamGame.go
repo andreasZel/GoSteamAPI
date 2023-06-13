@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
+	"github.com/gocolly/colly" 
 	"github.com/tidwall/gjson"
-
+	"strings"
 	"go.mongodb.org/mongo-driver/mongo"
 	//"go.mongodb.org/mongo-driver/mongo/options"
 	//"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -483,10 +483,91 @@ func (GC GameController) UpdateGame (
 	
 	json.Unmarshal([]byte(gjson.GetBytes(body4, `deals`).String()), &current_deals)
 	
+	//! ===================> TEST <===================
+	//Create a collector from colly package
+	//to scrap google for eneba, kinguin deals
+	collector := colly.NewCollector()
 
-	fmt.Println(GameDeals)
-	fmt.Println("current_deals length:")
-	fmt.Println(len(current_deals))
+	game_name_url_format := strings.ReplaceAll(steam_games.Name, " ", "+")
+
+	url_eneba := `http://www.google.com/search?q=eneba+`+ game_name_url_format +`+price+pc/`
+	url_Allkeyshop := `http://www.google.com/search?q=Allkeyshop+`+ game_name_url_format +`+price+pc/`
+	url_kinguin := `http://www.google.com/search?q=kinguin+`+ game_name_url_format +`+price+pc/`
+
+	collector.OnError(func(_ *colly.Response, err error) { 
+		fmt.Println("Something went wrong: ", err) 
+		return
+	}) 
+
+	price_scrapped:= []string{}
+	startcount := false
+	count := 0
+
+	collector.OnHTML("body", func(element *colly.HTMLElement) { 
+
+		// printing all URLs associated with the a links in the page 
+		//current_deals[len(current_deals)].RetailPrice = 
+		element.ForEach("span", func(_ int, spanelement * colly.HTMLElement) {
+			
+			
+			if strings.Contains(spanelement.Text, "Αξιολόγηση") {
+				startcount = true
+			}
+			
+			if startcount == true {
+				count++
+			}
+
+			if count == 7 {
+				if strings.Contains(spanelement.Text, "€") {
+					price_scrapped = append(price_scrapped, spanelement.Text)
+					fmt.Println(price_scrapped)//! TEST <===============================
+				}else {
+					count = 0
+				}
+			}
+		}) 
+		
+	}) 
+	
+	collector.OnRequest(func(r *colly.Request) {
+		fmt.Println("Visiting", r.URL)//! TEST <===============================
+	})
+
+	collector.Visit(url_eneba) 		//id = 25
+	startcount = false
+	count = 0
+	collector.Visit(url_kinguin)	//id = 26
+	startcount = false
+	count = 0
+	collector.Visit(url_Allkeyshop) //id = 27
+
+	var more_deals struct{
+		StoreId			string  `json:"storeId" bson:"storeId"`
+		RetailPrice 	string	`json:"retailPrice" bson:"retailPrice"`
+		Date			string	`json:"date" bson:"date"`
+	}
+
+	for idx := range price_scrapped {
+		if price_scrapped[idx] != "" {
+			if strings.Contains(price_scrapped[idx], "Από") {
+				price_scrapped[idx] = price_scrapped[idx][6:12]
+			}	
+
+			tmp := strings.ReplaceAll(price_scrapped[idx], "€", "")
+			
+			more_deals.RetailPrice = strings.ReplaceAll(tmp, ",", ".")
+			more_deals.StoreId = strconv.Itoa(idx+24)
+			more_deals.Date = ""
+
+			current_deals = append(current_deals, more_deals)
+		}
+	}
+	
+	fmt.Println(current_deals)//! TEST <===============================
+	return//! TEST <===============================
+
+	//! ===================> TEST <===================
 
 	for idx := range current_deals {
 
