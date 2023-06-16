@@ -279,8 +279,6 @@ func (GC GameController) CreateGame(
 	json.Unmarshal(body3, &CheapSharkDat)
 	fmt.Println(CheapSharkDat)
 
-	no_cheapest_price := false
-
 	//============================================= ADED AS DEBUG =============================================
 	if len(CheapSharkDat) > 0 {
 
@@ -310,7 +308,6 @@ func (GC GameController) CreateGame(
 
 		json.Unmarshal([]byte(gjson.GetBytes(body4, `deals`).String()), &GameDeals.Deals)
 	} else {
-		no_cheapest_price = true
 		GameDeals.CheapSharkId = ""
 		GameDeals.Cheapest = append(GameDeals.Cheapest, "")
 		GameDeals.Cheapest = append(GameDeals.Cheapest, "")
@@ -386,15 +383,12 @@ func (GC GameController) CreateGame(
 		RetailPrice string `json:"retailPrice" bson:"retailPrice"`
 		Date        string `json:"date" bson:"date"`
 	}
-	//? DEBUG ==============================================
-	fmt.Println("price_scrapped")
-	fmt.Println(price_scrapped)
-
+	
 	for idx := range price_scrapped {
 		if price_scrapped[idx] != "" {
 			//Remove redundant data
 			if strings.Contains(price_scrapped[idx], "Από") {
-				price_scrapped[idx] = price_scrapped[idx][6:12]
+				price_scrapped[idx] = price_scrapped[idx][6:11]
 			}
 
 			tmp := strings.ReplaceAll(price_scrapped[idx], "€", "")
@@ -403,41 +397,46 @@ func (GC GameController) CreateGame(
 			more_deals.StoreId = strconv.Itoa(idx + 25)
 			more_deals.Date = ""
 
-			//Add values to struct array
-			GameDeals.Deals = append(GameDeals.Deals, more_deals)
-		}
-	}
-
-	fmt.Println("More deals")
-	fmt.Println(more_deals)
-
-	cheapest_price, _ := strconv.ParseFloat("1100", 32)
-	var current_value float64
-
-	fmt.Println(current_value) //DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-	for idx := range GameDeals.Deals {
-
-		if no_cheapest_price == true {
-
-			current_value, _ := strconv.ParseFloat(GameDeals.Deals[idx].RetailPrice, 32)
-
-			if current_value < cheapest_price {
-				cheapest_price = current_value
+			//Add values to struct array if the game is not free
+			if steam_games.Price[0].PriceOnDate != "free" {
+				GameDeals.Deals = append(GameDeals.Deals, more_deals)
 			}
 		}
-		GameDeals.Deals[idx].Date = strconv.FormatInt(currentTime.Unix(), 10)
 	}
 
-	//? Might need tweaking
-	if no_cheapest_price == true && cheapest_price != 1100 {
-		GameDeals.Cheapest[0] = strconv.FormatFloat(cheapest_price, 'E', -1, 32)
+	if steam_games.Price[0].PriceOnDate != "free" {
+		
+		cheapest_price, _ := strconv.ParseFloat("1100", 32)
+		var current_value float64
+		var index int 
+
+		fmt.Println(current_value) 
+
+		for idx := range GameDeals.Deals {
+
+			if GameDeals.Cheapest[0] == "" {
+
+				current_value, _ := strconv.ParseFloat(GameDeals.Deals[idx].RetailPrice, 32)
+
+				if current_value < cheapest_price {
+					cheapest_price = current_value
+					index = idx
+				}
+			}
+			GameDeals.Deals[idx].Date = strconv.FormatInt(currentTime.Unix(), 10)
+		}
+	
+
+		if GameDeals.Cheapest[0] == "" {
+			GameDeals.Cheapest[0] = GameDeals.Deals[index].RetailPrice
+			GameDeals.Cheapest[1] = strconv.FormatInt(currentTime.Unix(), 10)
+		}
+
+	}else {
+		GameDeals.Cheapest[0] = "free"
 		GameDeals.Cheapest[1] = strconv.FormatInt(currentTime.Unix(), 10)
-	} else {
-		GameDeals.Cheapest[0] = ""
-		GameDeals.Cheapest[1] = ""
 	}
-
+	
 	result2, err := GC.client.Database("SteamPriceDB").Collection("GameDeals").InsertOne(ctx, GameDeals)
 
 	if err != nil {
@@ -450,6 +449,12 @@ func (GC GameController) CreateGame(
 
 	//Transform the results to json
 	steam_Gamejson, err := json.Marshal(steam_games)
+	
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	game_dealsjson, err := json.Marshal(GameDeals)
 
 	if err != nil {
 		fmt.Println(err)
@@ -459,6 +464,7 @@ func (GC GameController) CreateGame(
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(writer, "%s\n", steam_Gamejson)
+	fmt.Fprintf(writer, "%s\n", game_dealsjson)
 }
 
 // [POST] UpdateGame
@@ -585,7 +591,6 @@ func (GC GameController) UpdateGame(
 		Date        string `json:"date" bson:"date"`
 	}
 
-	//============================================= ADED AS DEBUG =============================================
 	if GameDeals.CheapSharkId != "" {
 		//Send GET Request to cheapshark to get the Deals for the game
 		apiUrl3 := `https://www.cheapshark.com/api/1.0/games?id=` + GameDeals.CheapSharkId + ``
@@ -614,12 +619,7 @@ func (GC GameController) UpdateGame(
 		}
 
 		json.Unmarshal([]byte(gjson.GetBytes(body4, `deals`).String()), &current_deals)
-
-		fmt.Println("current_deals")
-		fmt.Println(current_deals)
 	}
-
-	//============================================= ADED AS DEBUG =============================================
 
 	//Create a collector from colly package
 	//to scrap google for eneba, kinguin deals
@@ -689,65 +689,66 @@ func (GC GameController) UpdateGame(
 		RetailPrice string `json:"retailPrice" bson:"retailPrice"`
 		Date        string `json:"date" bson:"date"`
 	}
-	//? DEBUG ==================================================
-	fmt.Println("price_scrapped")
-	fmt.Println(price_scrapped)
-	fmt.Println(len(price_scrapped))
 
 	for idx := range price_scrapped {
 		if price_scrapped[idx] != "" {
 			//Remove redundant data
 			if strings.Contains(price_scrapped[idx], "Από") {
-				price_scrapped[idx] = price_scrapped[idx][6:12]
+				price_scrapped[idx] = price_scrapped[idx][6:11]
 			}
 
 			tmp := strings.ReplaceAll(price_scrapped[idx], "€", "")
 			more_deals.RetailPrice = strings.ReplaceAll(tmp, ",", ".")
 			more_deals.StoreId = strconv.Itoa(idx + 25)
-			fmt.Println(more_deals.StoreId)
 			more_deals.Date = ""
 
-			//Add values to struct array
-			current_deals = append(current_deals, more_deals)
+			//Add values to struct array, if it's not free
+			if steam_games.Price[0].PriceOnDate != "free" {
+				current_deals = append(current_deals, more_deals)
+			}
 		}
 	}
 
-	fmt.Println("More deals")
-	fmt.Println(more_deals)
+	if steam_games.Price[0].PriceOnDate != "free" {
+		for idx := range current_deals {
 
-	for idx := range current_deals {
+			err_sameVal := false
+			current_price, _ := strconv.ParseFloat(current_deals[idx].RetailPrice, 32)
 
-		err_sameVal := false
-		current_price, _ := strconv.ParseFloat(current_deals[idx].RetailPrice, 32)
+			//Check if the deal already exist
+			for idy := range GameDeals.Deals {
 
-		//Check if the deal already exist
-		for idy := range GameDeals.Deals {
+				gamedeals_price, _ := strconv.ParseFloat(GameDeals.Deals[idy].RetailPrice, 32)
 
-			gamedeals_price, _ := strconv.ParseFloat(GameDeals.Deals[idy].RetailPrice, 32)
+				if GameDeals.Deals[idy].Date[0:6] == current_time_unix[0:6] &&
+					GameDeals.Deals[idy].StoreId == current_deals[idx].StoreId {
 
-			if GameDeals.Deals[idy].Date[0:6] == current_time_unix[0:6] &&
-				GameDeals.Deals[idy].StoreId == current_deals[idx].StoreId {
-
-				//if the price was lowered in a day, update the price
-				if gamedeals_price < current_price {
-					GameDeals.Deals[idy].RetailPrice = current_deals[idx].RetailPrice
+					//if the price was lowered in a day, update the price
+					if gamedeals_price < current_price {
+						GameDeals.Deals[idy].RetailPrice = current_deals[idx].RetailPrice
+					}
+					err_sameVal = true
+					break
 				}
-				err_sameVal = true
-				break
 			}
-		}
 
-		//If the price does not exist in db
-		//append the struct to the previous array of structs
-		if err_sameVal != true {
-			current_deals[idx].Date = current_time_unix
-			GameDeals.Deals = append(GameDeals.Deals, current_deals[idx])
+			//If the price does not exist in db
+			//append the struct to the previous array of structs
+			if err_sameVal != true {
+				current_deals[idx].Date = current_time_unix
+				GameDeals.Deals = append(GameDeals.Deals, current_deals[idx])
+			}
 		}
 	}
 
 	//Declare a filter that will change field values
 	//according to SteamGame struct
 	update2 := bson.M{"$set": bson.M{"cheapest": GameDeals.Cheapest, "deals": GameDeals.Deals}}
+
+	if steam_games.Price[0].PriceOnDate == "free" {
+		GameDeals.Cheapest[0] = "free"
+		GameDeals.Cheapest[1] = strconv.FormatInt(currentTime.Unix(), 10)
+	}
 
 	//Incert the new deals for our collection
 	result4, err := GC.client.Database("SteamPriceDB").Collection("GameDeals").UpdateOne(ctx, filter2, update2)
@@ -766,9 +767,16 @@ func (GC GameController) UpdateGame(
 		fmt.Println(err)
 	}
 
+	current_dealsjson, err := json.Marshal(GameDeals)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(writer, "%s\n", steam_gamesjson)
+	fmt.Fprintf(writer, "%s\n", current_dealsjson)
 }
 
 // [DELETE] DeleteGame (id)
