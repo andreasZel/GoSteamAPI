@@ -44,20 +44,23 @@ func (GC GameController) AllGames(
 	request *http.Request,
 	_ httprouter.Params) {
 
-	steam_games := Models.SteamGame{}
+	var steam_games []Models.SteamGame
 
 	ctx := context.Background()
 
-	cursor, err := GC.client.Database("SteamPriceDB").Collection("SteamGames").Find(ctx, bson.D{})
+	cursor, err := GC.client.Database("SteamPriceDB").Collection("SteamGames").Find(ctx, bson.M{})
 
 	if err != nil {
-		writer.WriteHeader(http.StatusNotFound)
+		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	cursor.Decode(&steam_games)
+	if err := cursor.All(context.Background(), &steam_games); err != nil {
+		fmt.Println(err)
+	}
 
-	steam_gamesjson, err := json.Marshal(steam_games)
+	//Transform the results to json
+	steam_Gamejson, err := json.Marshal(steam_games)
 
 	if err != nil {
 		fmt.Println(err)
@@ -65,7 +68,7 @@ func (GC GameController) AllGames(
 
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
-	fmt.Println(writer, "%s\n", steam_gamesjson)
+	fmt.Fprintf(writer, "%s\n", steam_Gamejson)
 }
 
 // [GET] GetsteamGame
@@ -279,7 +282,6 @@ func (GC GameController) CreateGame(
 	json.Unmarshal(body3, &CheapSharkDat)
 	fmt.Println(CheapSharkDat)
 
-	//============================================= ADED AS DEBUG =============================================
 	if len(CheapSharkDat) > 0 {
 
 		GameDeals.CheapSharkId = CheapSharkDat[0]["gameID"]
@@ -312,8 +314,6 @@ func (GC GameController) CreateGame(
 		GameDeals.Cheapest = append(GameDeals.Cheapest, "")
 		GameDeals.Cheapest = append(GameDeals.Cheapest, "")
 	}
-
-	//============================================= ADED AS DEBUG =============================================
 
 	//Create a collector from colly package
 	//to scrap google for eneba, kinguin deals
