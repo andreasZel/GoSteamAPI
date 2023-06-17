@@ -779,30 +779,60 @@ func (GC GameController) UpdateGame(
 	fmt.Fprintf(writer, "%s\n", current_dealsjson)
 }
 
-// [DELETE] DeleteGame (id)
+// [DELETE] DeleteGame 
 func (GC GameController) DeleteGame(
 	writer http.ResponseWriter,
 	request *http.Request,
-	params httprouter.Params) {
+	_ httprouter.Params) {
 
-	//Get id from parameters of get request
-	id := params.ByName("id")
+	//Get the steamGameId from response body
+	steamGameId := ResponseGameId{}
 
-	if !bson.IsObjectIdHex(id) {
-		writer.WriteHeader(http.StatusNotFound)
+	err := json.NewDecoder(request.Body).Decode(&steamGameId)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	if steamGameId.GameId == "" {
+		fmt.Println("Provide a GameId in Body, example { GameId : 1203220 }")
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	oid := bson.ObjectIdHex(id)
-	filter := bson.M{"_id": bson.M{"$eq": oid}}
+	//Create filter to find if the steamappId exist in db
+	filter := bson.M{"steam_appid": steamGameId.GameId}
 
-	if result, err := GC.client.Database("SteamPriceDB").Collection("SteamGames").DeleteOne(context.TODO(), filter); err != nil {
-		fmt.Fprintln(writer, "Error Deleting Game\n", result, "\n")
-		writer.WriteHeader(http.StatusNotFound)
+	//Find a file that has that bson object id and pass
+	//it to steam_games model
+	ctx := context.Background()
+
+	result, err := GC.client.Database("SteamPriceDB").Collection("SteamGames").DeleteOne(ctx, filter) 
+	
+	if err != nil{
+		fmt.Println(err)
+		writer.WriteHeader(http.StatusConflict)
+		return
 	}
 
+	fmt.Println(result)
+
+	//Create filter to find if the steamappId exist in db
+	filter2 := bson.M{"gameId": steamGameId.GameId}
+
+	result2, err := GC.client.Database("SteamPriceDB").Collection("GameDeals").DeleteOne(ctx, filter2) 
+
+	if err != nil{
+		fmt.Println(err)
+		writer.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	fmt.Println(result2)
+
+	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
-	fmt.Fprintln(writer, "Delete Game\n", oid, "\n")
 }
 
 // [GET] GetSteamGamesNameList
