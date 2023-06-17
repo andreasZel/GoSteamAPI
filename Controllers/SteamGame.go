@@ -804,3 +804,51 @@ func (GC GameController) DeleteGame(
 	writer.WriteHeader(http.StatusOK)
 	fmt.Fprintln(writer, "Delete Game\n", oid, "\n")
 }
+
+// [GET] GetSteamGamesNameList
+func (GC GameController) GetSteamGames(
+	writer http.ResponseWriter,
+	_ *http.Request,
+	_ httprouter.Params) {
+	
+	//Send GET Request to steam API
+	apiUrl := `https://api.steampowered.com/ISteamApps/GetAppList/v2/`
+	response, err := http.Get(apiUrl)
+
+	if err != nil {
+		writer.WriteHeader(http.StatusNotFound)
+		fmt.Println("err")
+		return
+	}
+
+	//Close Body on return of function
+	defer response.Body.Close()
+
+	//Read the response body
+	body, err := io.ReadAll(response.Body)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var Steam_Game_List []Models.SteamInfo
+
+	//Get only specific fields using gjson package
+	applist_string := gjson.GetBytes(body, `applist.apps`).String()
+
+	err = json.Unmarshal([]byte(applist_string), &Steam_Game_List)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	current_dealsjson, err := json.Marshal(Steam_Game_List)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusFound)
+	fmt.Fprintf(writer, "%s\n", current_dealsjson)
+}
