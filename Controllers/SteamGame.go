@@ -42,10 +42,7 @@ func NewGameController(client *mongo.Client) *GameController {
 func (GC GameController) AllGames(
 	writer http.ResponseWriter,
 	request *http.Request,
-	_ httprouter.Params) {
-
-	//? Enable CORS
-	writer.Header().Set("Access-Control-Allow-Origin", "*")	
+	_ httprouter.Params) {	
 	
 	var steam_games []Models.SteamGame
 
@@ -79,9 +76,6 @@ func (GC GameController) GetSteamGame(
 	writer http.ResponseWriter,
 	request *http.Request,
 	params httprouter.Params) {
-
-	//? Enable CORS
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
 
 	//Get the steamGameId from response body
 	steamGameId := ResponseGameId{}
@@ -133,9 +127,6 @@ func (GC GameController) CreateGame(
 	writer http.ResponseWriter,
 	request *http.Request,
 	_ httprouter.Params) {
-
-	//? Enable CORS
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
 
 	//Get the steamGameId from response body
 	steamGameId := ResponseGameId{}
@@ -482,9 +473,6 @@ func (GC GameController) UpdateGame(
 	request *http.Request,
 	params httprouter.Params) {
 
-	//? Enable CORS
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
-
 	//Get the steamGameId from response body
 	steamGameId := ResponseGameId{}
 
@@ -797,9 +785,6 @@ func (GC GameController) DeleteGame(
 	request *http.Request,
 	_ httprouter.Params) {
 
-	//? Enable CORS
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
-
 	//Get the steamGameId from response body
 	steamGameId := ResponseGameId{}
 
@@ -856,9 +841,6 @@ func (GC GameController) GetSteamGames(
 	_ *http.Request,
 	_ httprouter.Params) {
 	
-	//? Enable CORS
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
-
 	//Send GET Request to steam API
 	apiUrl := `https://api.steampowered.com/ISteamApps/GetAppList/v2/`
 	response, err := http.Get(apiUrl)

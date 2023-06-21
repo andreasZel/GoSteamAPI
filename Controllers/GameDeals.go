@@ -30,10 +30,7 @@ func (GDC GameDealsController) GetGameDeals(
 	writer http.ResponseWriter,
 	request *http.Request,
 	params httprouter.Params) {
-
-	//? Enable CORS
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
-
+	
 	//Get the steamGameId from response body
 	steamGameId :=  GameDealId{}
 
