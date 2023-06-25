@@ -25,7 +25,7 @@ func NewGameDealsController(client *mongo.Client) *GameDealsController {
 	return &GameDealsController{client}
 }
 
-// [GET] GetGameDeals 
+// [POST] GetGameDeals 
 func (GDC GameDealsController) GetGameDeals(
 	writer http.ResponseWriter,
 	request *http.Request,

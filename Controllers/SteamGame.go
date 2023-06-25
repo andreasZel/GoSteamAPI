@@ -200,6 +200,12 @@ func (GC GameController) CreateGame(
 		steam_games.Price[0].PriceOnDate = "free"
 		steam_games.Price[0].Date = strconv.FormatInt(currentTime.Unix(), 10)
 	}
+	
+	//! ADDEDDD
+	if steam_games.Price[0].PriceOnDate == "" {
+		steam_games.Price[0].PriceOnDate = "free"
+		steam_games.Price[0].Date = strconv.FormatInt(currentTime.Unix(), 10)
+	}
 
 	steam_games.Platforms = append(steam_games.Platforms, gjson.GetBytes(body, ``+steamGameId.GameId+`.data.platforms.windows`).String())
 	steam_games.Platforms = append(steam_games.Platforms, gjson.GetBytes(body, ``+steamGameId.GameId+`.data.platforms.mac`).String())
@@ -454,17 +460,17 @@ func (GC GameController) CreateGame(
 		fmt.Println(err)
 	}
 
-	game_dealsjson, err := json.Marshal(GameDeals)
+	//game_dealsjson, err := json.Marshal(GameDeals)
 
-	if err != nil {
-		fmt.Println(err)
-	}
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
 
 	//Display Ok if everything worked out
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(writer, "%s\n", steam_Gamejson)
-	fmt.Fprintf(writer, "%s\n", game_dealsjson)
+	//fmt.Fprintf(writer, "%s\n", game_dealsjson)
 }
 
 // [POST] UpdateGame
@@ -879,6 +885,6 @@ func (GC GameController) GetSteamGames(
 	}
 
 	writer.Header().Set("Content-Type", "application/json")
-	writer.WriteHeader(http.StatusFound)
+	writer.WriteHeader(http.StatusOK)
 	fmt.Fprintf(writer, "%s\n", current_dealsjson)
 }
