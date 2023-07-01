@@ -374,13 +374,13 @@ func (GC GameController) CreateGame(
 
 	//Visit Eneba, kinguin and allkeyshop and
 	//get pc price if it exist
-	collector.Visit(url_eneba) //id = 25
+	collector.Visit(url_eneba) //id = 36
 	startcount = false
 	count = 0
-	collector.Visit(url_kinguin) //id = 26
+	collector.Visit(url_kinguin) //id = 37
 	startcount = false
 	count = 0
-	collector.Visit(url_Allkeyshop) //id = 27
+	collector.Visit(url_Allkeyshop) //id = 38
 
 	collector.Wait()
 
@@ -400,7 +400,7 @@ func (GC GameController) CreateGame(
 			tmp := strings.ReplaceAll(price_scrapped[idx], "€", "")
 			tmp = strings.ReplaceAll(tmp, " ", "")
 			more_deals.RetailPrice = strings.ReplaceAll(tmp, ",", ".")
-			more_deals.StoreId = strconv.Itoa(idx + 25)
+			more_deals.StoreId = strconv.Itoa(idx + 36)
 			more_deals.Date = ""
 
 			//Add values to struct array if the game is not free
@@ -773,16 +773,16 @@ func (GC GameController) UpdateGame(
 		fmt.Println(err)
 	}
 
-	current_dealsjson, err := json.Marshal(GameDeals)
+	//current_dealsjson, err := json.Marshal(GameDeals)
 
-	if err != nil {
-		fmt.Println(err)
-	}
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
 
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(writer, "%s\n", steam_gamesjson)
-	fmt.Fprintf(writer, "%s\n", current_dealsjson)
+	//fmt.Fprintf(writer, "%s\n", current_dealsjson)
 }
 
 // [DELETE] DeleteGame 
