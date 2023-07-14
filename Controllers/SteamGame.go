@@ -71,7 +71,7 @@ func (GC GameController) AllGames(
 	fmt.Fprintf(writer, "%s\n", steam_Gamejson)
 }
 
-// [GET] GetsteamGame
+// [POST] GetsteamGame
 func (GC GameController) GetSteamGame(
 	writer http.ResponseWriter,
 	request *http.Request,
@@ -104,8 +104,8 @@ func (GC GameController) GetSteamGame(
 	ctx := context.Background()
 
 	if err := GC.client.Database("SteamPriceDB").Collection("SteamGames").FindOne(ctx, filter).Decode(&steam_games); err != nil {
-		fmt.Println(err)
-		writer.WriteHeader(http.StatusBadRequest)
+		//fmt.Println(err)
+		//writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
