@@ -106,7 +106,9 @@ func (GC GameController) GetSteamGame(
 	if err := GC.client.Database("SteamPriceDB").Collection("SteamGames").FindOne(ctx, filter).Decode(&steam_games); err != nil {
 		//fmt.Println(err)
 		//writer.WriteHeader(http.StatusBadRequest)
-		return
+		if err == mongo.ErrNoDocuments {
+			return
+		}
 	}
 
 	//Transform the results to json
