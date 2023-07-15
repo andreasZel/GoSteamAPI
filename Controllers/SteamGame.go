@@ -588,7 +588,13 @@ func (GC GameController) UpdateGame(
 
 	if err := GC.client.Database("SteamPriceDB").Collection("GameDeals").FindOne(ctx, filter2).Decode(&GameDeals); err != nil {
 		fmt.Println(err)
-		writer.WriteHeader(http.StatusBadRequest)
+		fmt.Println("No deals found")
+		
+		if steam_games.Price[0].PriceOnDate == "free" {
+			writer.WriteHeader(200)
+		}else {
+			writer.WriteHeader(http.StatusBadRequest)
+		}
 		return
 	}
 
