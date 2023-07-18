@@ -1,7 +1,6 @@
 package Controllers
 
 import (
-	//"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,19 +8,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 	"github.com/gocolly/colly"
 	"github.com/tidwall/gjson"
 	"go.mongodb.org/mongo-driver/mongo"
-
-	//"go.mongodb.org/mongo-driver/mongo/options"
-	//"go.mongodb.org/mongo-driver/mongo/readpref"
 	"context"
-
 	"github.com/andreasZel/GoSteamAPI/Models"
 	"github.com/julienschmidt/httprouter"
-
-	//"gopkg.in/mgo.v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -186,8 +178,6 @@ func (GC GameController) CreateGame(
 
 	currentTime := time.Now()
 
-	fmt.Println(len(steam_games.Price))
-
 	game_price_struct := `[{
 							"priceOnDate" : "",
 							"Date" : ""
@@ -203,7 +193,6 @@ func (GC GameController) CreateGame(
 		steam_games.Price[0].Date = strconv.FormatInt(currentTime.Unix(), 10)
 	}
 	
-	//! ADDEDDD
 	if steam_games.Price[0].PriceOnDate == "" {
 		steam_games.Price[0].PriceOnDate = "free"
 		steam_games.Price[0].Date = strconv.FormatInt(currentTime.Unix(), 10)
@@ -255,6 +244,7 @@ func (GC GameController) CreateGame(
 		return
 	}
 
+	fmt.Println("incerted:")
 	fmt.Println(result)
 
 	//Get our GameDeal model
@@ -288,7 +278,7 @@ func (GC GameController) CreateGame(
 	var CheapSharkDat []map[string]string
 
 	json.Unmarshal(body3, &CheapSharkDat)
-	fmt.Println(CheapSharkDat)
+	//fmt.Println(CheapSharkDat)
 
 	if len(CheapSharkDat) > 0 {
 
@@ -462,17 +452,10 @@ func (GC GameController) CreateGame(
 		fmt.Println(err)
 	}
 
-	//game_dealsjson, err := json.Marshal(GameDeals)
-
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-
 	//Display Ok if everything worked out
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(writer, "%s\n", steam_Gamejson)
-	//fmt.Fprintf(writer, "%s\n", game_dealsjson)
 }
 
 // [POST] UpdateGame
@@ -576,7 +559,7 @@ func (GC GameController) UpdateGame(
 			fmt.Println(err)
 			return
 		}
-
+		fmt.Println("updated:")
 		fmt.Println(result3)
 	}
 
@@ -773,6 +756,7 @@ func (GC GameController) UpdateGame(
 		return
 	}
 
+	fmt.Println("updated:")
 	fmt.Println(result4)
 
 	steam_gamesjson, err := json.Marshal(steam_games)
@@ -781,16 +765,9 @@ func (GC GameController) UpdateGame(
 		fmt.Println(err)
 	}
 
-	//current_dealsjson, err := json.Marshal(GameDeals)
-
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(writer, "%s\n", steam_gamesjson)
-	//fmt.Fprintf(writer, "%s\n", current_dealsjson)
 }
 
 // [DELETE] DeleteGame 
@@ -843,6 +820,7 @@ func (GC GameController) DeleteGame(
 		return
 	}
 
+	fmt.Println("deleted:")
 	fmt.Println(result2)
 
 	writer.Header().Set("Content-Type", "application/json")
